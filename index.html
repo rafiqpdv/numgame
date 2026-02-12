@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9333ea">
+    <meta name="description" content="Multiplayer number guessing game - Find the secret 4-digit number!">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Number Guess">
+    
+    <title>Number Guess - Multiplayer Game</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+        #root {
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+
+        function NumberGuessingGame() {
+          const [gameState, setGameState] = useState('menu');
+          const [roomCode, setRoomCode] = useState('');
+          const [playerName, setPlayerName] = useState('');
+          const [playerNumber, setPlayerNumber] = useState(1);
+          const [mySecret, setMySecret] = useState('');
+          const [opponentSecret, setOpponentSecret] = useState('');
+          const [currentGuess, setCurrentGuess] = useState('');
+          const [myGuesses, setMyGuesses] = useState([]);
+          const [opponentGuesses, setOpponentGuesses] = useState([]);
+          const [winner, setWinner] = useState(null);
+          const [opponentReady, setOpponentReady] = useState(false);
+          const [opponentName, setOpponentName] = useState('');
+
+          const generateRoomCode = () => {
+            return Math.floor(1000 + Math.random() * 9000).toString();
+          };
+
+          const hasUniqueDigits = (num) => {
+            const digits = num.split('');
+            return digits.length === new Set(digits).size;
+          };
+
+          const checkGuess = (guess, secret) => {
+            let correctNumbers = 0;
+            let correctPositions = 0;
+            
+            const guessDigits = guess.split('');
+            const secretDigits = secret.split('');
+            
+            for (let i = 0; i < 4; i++) {
+              if (guessDigits[i] === secretDigits[i]) {
+                correctPositions++;
+              }
+            }
+            
+            for (let digit of guessDigits) {
+              if (secretDigits.includes(digit)) {
+                correctNumbers++;
+              }
+            }
+            
+            return { correctNumbers, correctPositions };
+          };
+
+          const startNewGame = () => {
+            const room = generateRoomCode();
+            setRoomCode(room);
+            setPlayerNumber(1);
+            setGameState('setup');
+            setMyGuesses([]);
+            setOpponentGuesses([]);
+            setWinner(null);
+            setMySecret('');
+            setOpponentSecret('');
+            setOpponentReady(false);
+            setOpponentName('Player 2');
+          };
+
+          const joinGame = () => {
+            if (roomCode.length === 4) {
+              setPlayerNumber(2);
+              setGameState('setup');
+              setMyGuesses([]);
+              setOpponentGuesses([]);
+              setWinner(null);
+              setMySecret('');
+              setOpponentSecret('');
+              setOpponentReady(true);
+              setOpponentName('Player 1');
+            }
+          };
+
+          const setSecretNumber = () => {
+            if (mySecret.length === 4 && hasUniqueDigits(mySecret)) {
+              if (!opponentReady) {
+                const randomSecret = generateRandomSecret();
+                setOpponentSecret(randomSecret);
+                setOpponentReady(true);
+              }
+              setGameState('playing');
+            }
+          };
+
+          const generateRandomSecret = () => {
+            const digits = [];
+            while (digits.length < 4) {
+              const digit = Math.floor(Math.random() * 10).toString();
+              if (!digits.includes(digit)) {
+                digits.push(digit);
+              }
+            }
+            return digits.join('');
+          };
+
+          const makeGuess = () => {
+            if (currentGuess.length === 4 && hasUniqueDigits(currentGuess)) {
+              const result = checkGuess(currentGuess, opponentSecret);
+              const newGuess = {
+                guess: currentGuess,
+                correctNumbers: result.correctNumbers,
+                correctPositions: result.correctPositions,
+                turn: myGuesses.length + 1
+              };
+              
+              setMyGuesses([...myGuesses, newGuess]);
+              
+              if (result.correctPositions === 4) {
+                setWinner(playerNumber);
+                setGameState('won');
+              } else {
+                setCurrentGuess('');
+                simulateOpponentTurn();
+              }
+            }
+          };
+
+          const simulateOpponentTurn = () => {
+            setTimeout(() => {
+              const randomGuess = generateRandomSecret();
+              const result = checkGuess(randomGuess, mySecret);
+              const newGuess = {
+                guess: randomGuess,
+                correctNumbers: result.correctNumbers,
+                correctPositions: result.correctPositions,
+                turn: opponentGuesses.length + 1
+              };
+              
+              setOpponentGuesses(prev => [...prev, newGuess]);
+              
+              if (result.correctPositions === 4) {
+                setWinner(playerNumber === 1 ? 2 : 1);
+                setGameState('won');
+              }
+            }, 1500);
+          };
+
+          const handleSecretInput = (value) => {
+            if (/^\d*$/.test(value) && value.length <= 4) {
+              setMySecret(value);
+            }
+          };
+
+          const handleGuessInput = (value) => {
+            if (/^\d*$/.test(value) && value.length <= 4) {
+              setCurrentGuess(value);
+            }
+          };
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 p-4">
+              <div className="max-w-md mx-auto">
+                <div className="text-center mb-6 pt-4">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" strokeWidth="2"/>
+                      <circle cx="12" cy="12" r="6" strokeWidth="2"/>
+                      <circle cx="12" cy="12" r="2" strokeWidth="2"/>
+                    </svg>
+                    <h1 className="text-3xl font-bold text-white">Number Guess</h1>
+                  </div>
+                  <p className="text-white/90 text-sm">Find the 4-digit secret number!</p>
+                </div>
+
+                {gameState === 'menu' && (
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-4">
+                    <div className="text-center mb-6">
+                      <div className="w-16 h-16 mx-auto text-purple-500 mb-3 flex items-center justify-center">
+                        <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="3" y="3" width="7" height="7" rx="1"/>
+                          <rect x="14" y="3" width="7" height="7" rx="1"/>
+                          <rect x="14" y="14" width="7" height="7" rx="1"/>
+                          <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-800">Welcome!</h2>
+                      <p className="text-gray-600 mt-2">Choose how to play</p>
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Your name"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none"
+                    />
+
+                    <button
+                      onClick={startNewGame}
+                      disabled={!playerName}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Create New Room
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Room code"
+                        value={roomCode}
+                        onChange={(e) => setRoomCode(e.target.value.slice(0, 4))}
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:outline-none text-center text-xl font-bold"
+                        maxLength={4}
+                      />
+                      <button
+                        onClick={joinGame}
+                        disabled={!playerName || roomCode.length !== 4}
+                        className="px-6 py-3 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Join
+                      </button>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mt-6 text-white">
+                      <h3 className="font-bold text-lg mb-3">How to Play:</h3>
+                      <ul className="space-y-2 text-sm">
+                        <li>• Set a 4-digit secret number (all digits unique)</li>
+                        <li>• Take turns guessing your opponent's number</li>
+                        <li>• Get feedback: correct numbers & correct positions</li>
+                        <li>• First to guess the exact number wins!</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {gameState === 'setup' && (
+                  <div className="bg-white rounded-2xl shadow-2xl p-8">
+                    <div className="text-center mb-6">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-2">Room: {roomCode}</h2>
+                      <p className="text-gray-600">You are Player {playerNumber}</p>
+                      <div className="mt-4 px-4 py-2 bg-purple-100 rounded-lg inline-block">
+                        <p className="text-sm text-purple-700 font-medium">
+                          {opponentReady ? '✓ Opponent connected' : '⏳ Waiting for opponent...'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mb-6">
+                      <label className="block text-gray-700 font-semibold mb-3 text-center">
+                        Set your secret 4-digit number
+                      </label>
+                      <p className="text-sm text-gray-500 text-center mb-4">All digits must be unique (0-9)</p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={mySecret}
+                        onChange={(e) => handleSecretInput(e.target.value)}
+                        placeholder="_ _ _ _"
+                        className="w-full px-4 py-4 text-3xl font-bold text-center border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none tracking-widest"
+                        maxLength={4}
+                      />
+                      {mySecret.length === 4 && !hasUniqueDigits(mySecret) && (
+                        <p className="text-red-500 text-sm mt-2 text-center">All digits must be unique!</p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={setSecretNumber}
+                      disabled={mySecret.length !== 4 || !hasUniqueDigits(mySecret)}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Start Game
+                    </button>
+                  </div>
+                )}
+
+                {gameState === 'playing' && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-2xl shadow-lg p-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm text-gray-600">Room</p>
+                          <p className="text-xl font-bold text-purple-600">{roomCode}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Your Turn</p>
+                          <p className="text-xl font-bold text-gray-800">#{myGuesses.length + 1}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                      <label className="block text-gray-700 font-semibold mb-3 text-center">
+                        Enter your guess
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={currentGuess}
+                        onChange={(e) => handleGuessInput(e.target.value)}
+                        placeholder="_ _ _ _"
+                        className="w-full px-4 py-4 text-3xl font-bold text-center border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:outline-none tracking-widest mb-4"
+                        maxLength={4}
+                      />
+                      <button
+                        onClick={makeGuess}
+                        disabled={currentGuess.length !== 4 || !hasUniqueDigits(currentGuess)}
+                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Submit Guess →
+                      </button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
+                        Your Guesses ({playerName})
+                      </h3>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {myGuesses.length === 0 ? (
+                          <p className="text-gray-400 text-center py-4">No guesses yet</p>
+                        ) : (
+                          myGuesses.map((g, i) => (
+                            <div key={i} className="bg-purple-50 rounded-lg p-3 flex justify-between items-center">
+                              <span className="font-bold text-xl text-gray-800 tracking-wider">{g.guess}</span>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-green-600">{g.correctNumbers}</span> correct numbers
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-blue-600">{g.correctPositions}</span> correct positions
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span className="w-3 h-3 bg-pink-500 rounded-full"></span>
+                        Opponent Guesses ({opponentName})
+                      </h3>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {opponentGuesses.length === 0 ? (
+                          <p className="text-gray-400 text-center py-4">No guesses yet</p>
+                        ) : (
+                          opponentGuesses.map((g, i) => (
+                            <div key={i} className="bg-pink-50 rounded-lg p-3 flex justify-between items-center">
+                              <span className="font-bold text-xl text-gray-800 tracking-wider">{g.guess}</span>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-green-600">{g.correctNumbers}</span> correct numbers
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-blue-600">{g.correctPositions}</span> correct positions
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {gameState === 'won' && (
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+                    <div className="text-6xl mb-4">🏆</div>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                      {winner === playerNumber ? '🎉 You Won!' : '😔 You Lost!'}
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                      {winner === playerNumber ? 'Congratulations!' : `${opponentName} found your number first!`}
+                    </p>
+                    <div className="bg-gray-100 rounded-xl p-4 mb-6">
+                      <p className="text-sm text-gray-600 mb-1">The secret number was:</p>
+                      <p className="text-4xl font-bold text-purple-600 tracking-widest">{opponentSecret}</p>
+                    </div>
+                    <div className="space-y-3">
+                      <p className="text-gray-700">
+                        You made <span className="font-bold text-purple-600">{myGuesses.length}</span> guesses
+                      </p>
+                      <p className="text-gray-700">
+                        {opponentName} made <span className="font-bold text-pink-600">{opponentGuesses.length}</span> guesses
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setGameState('menu')}
+                      className="mt-6 w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+                    >
+                      Play Again
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<NumberGuessingGame />);
+    </script>
+</body>
+</html>
