@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Number Guess Multiplayer</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body class="bg-gradient-to-br from-purple-600 to-pink-600 min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+
+// 🔴 PASTE YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+  apiKey: "AIzaSyA7NSVpe6r3xShg8A4xXTUus-8jevFp2GE",
+  databaseURL: "https://ah-numbergame-default-rtdb.asia-southeast1.firebasedatabase.app",
+  authDomain: "ah-numbergame.firebaseapp.com",
+  projectId: "ah-numbergame",
+  storageBucket: "ah-numbergame.firebasestorage.app",
+  messagingSenderId: "857673741338",
+  appId: "1:857673741338:web:3312e8c2c6780bce9d4da3",
+  measurementId: "G-ZFSGLVY60B"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const { useState, useEffect } = React;
+
+function App() {
+
+  const [screen, setScreen] = useState("menu");
+  const [room, setRoom] = useState("");
+  const [name, setName] = useState("");
+  const [player, setPlayer] = useState(1);
+  const [secret, setSecret] = useState("");
+  const [guess, setGuess] = useState("");
+  const [gameData, setGameData] = useState(null);
+
+  const generateRoom = () =>
+    Math.floor(1000 + Math.random() * 9000).toString();
+
+  const hasUnique = (n) =>
+    new Set(n.split("")).size === 4;
+
+  const createRoom = () => {
+    const newRoom = generateRoom();
+    setRoom(newRoom);
+    setPlayer(1);
+
+    db.ref("rooms/" + newRoom).set({
+      player1: name,
+      player2: null,
+      secret1: null,
+      secret2: null,
+      guesses: [],
+      winner: null
+    });
+
+    setScreen("setup");
+  };
+
+  const joinRoom = () => {
+    const ref = db.ref("rooms/" + room);
+    ref.once("value", snap => {
+      if (!snap.exists()) {
+        alert("Room not found");
+        return;
+      }
+
+      ref.update({ player2: name });
+      setPlayer(2);
+      setScreen("setup");
+    });
+  };
+
+  useEffect(() => {
+    if (!room) return;
+    const ref = db.ref("rooms/" + room);
+    ref.on("value", snap => {
+      setGameData(snap.val());
+    });
+    return () => ref.off();
+  }, [room]);
+
+  const submitSecret = () => {
+    if (secret.length !== 4 || !hasUnique(secret)) return;
+
+    db.ref("rooms/" + room).update({
+      ["secret" + player]: secret
+    });
+
+    setScreen("waiting");
+  };
+
+  useEffect(() => {
+    if (gameData?.secret1 && gameData?.secret2)
+      setScreen("play");
+  }, [gameData]);
+
+  const checkGuess = (g, s) => {
+    let correctPos = 0;
+    let correctNum = 0;
+
+    for (let i = 0; i < 4; i++)
+      if (g[i] === s[i]) correctPos++;
+
+    for (let d of g)
+      if (s.includes(d)) correctNum++;
+
+    return { correctNum, correctPos };
+  };
+
+  const makeGuess = () => {
+    if (!gameData) return;
+    if (guess.length !== 4 || !hasUnique(guess)) return;
+
+    const opponentSecret =
+      player === 1 ? gameData.secret2 : gameData.secret1;
+
+    const result = checkGuess(guess, opponentSecret);
+
+    const newGuess = {
+      player,
+      guess,
+      correctNum: result.correctNum,
+      correctPos: result.correctPos
+    };
+
+    const updated = [...(gameData.guesses || []), newGuess];
+
+    db.ref("rooms/" + room).update({
+      guesses: updated,
+      winner: result.correctPos === 4 ? player : null
+    });
+
+    setGuess("");
+  };
+
+  if (screen === "menu")
+    return (
+      <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
+        <input
+          className="border p-2 w-full mb-3"
+          placeholder="Your name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
+        <button
+          onClick={createRoom}
+          disabled={!name}
+          className="bg-purple-600 text-white w-full p-2 mb-3 rounded"
+        >
+          Create Room
+        </button>
+
+        <input
+          className="border p-2 w-full mb-3 text-center"
+          placeholder="Room Code"
+          maxLength="4"
+          value={room}
+          onChange={e => setRoom(e.target.value)}
+        />
+
+        <button
+          onClick={joinRoom}
+          disabled={!name || room.length !== 4}
+          className="bg-pink-600 text-white w-full p-2 rounded"
+        >
+          Join Room
+        </button>
+      </div>
+    );
+
+  if (screen === "setup")
+    return (
+      <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
+        <h2 className="text-xl font-bold mb-3">Room {room}</h2>
+        <p>Player {player}</p>
+
+        <input
+          className="border p-2 w-full mb-3 text-center text-xl"
+          maxLength="4"
+          value={secret}
+          onChange={e => setSecret(e.target.value)}
+          placeholder="Secret Number"
+        />
+
+        <button
+          onClick={submitSecret}
+          className="bg-purple-600 text-white w-full p-2 rounded"
+        >
+          Submit Secret
+        </button>
+      </div>
+    );
+
+  if (screen === "waiting")
+    return (
+      <div className="text-white text-center mt-40 text-2xl">
+        Waiting for opponent...
+      </div>
+    );
+
+  if (screen === "play")
+    return (
+      <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded-xl">
+        <h2 className="text-xl font-bold mb-3">Room {room}</h2>
+
+        {gameData?.winner && (
+          <div className="text-center text-2xl mb-4">
+            {gameData.winner === player ? "You Win!" : "You Lose!"}
+          </div>
+        )}
+
+        <input
+          className="border p-2 w-full mb-3 text-center text-xl"
+          maxLength="4"
+          value={guess}
+          onChange={e => setGuess(e.target.value)}
+          placeholder="Your Guess"
+        />
+
+        <button
+          onClick={makeGuess}
+          className="bg-purple-600 text-white w-full p-2 rounded mb-4"
+        >
+          Submit Guess
+        </button>
+
+        <div>
+          {gameData?.guesses?.map((g, i) => (
+            <div key={i} className="border p-2 mb-2">
+              Player {g.player}: {g.guess} →
+              {g.correctNum} correct numbers,
+              {g.correctPos} correct positions
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById("root"))
+  .render(<App />);
+
+</script>
+</body>
+</html>
