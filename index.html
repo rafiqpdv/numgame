@@ -38,18 +38,24 @@ function App() {
   const [screen, setScreen] = useState("menu");
   const [room, setRoom] = useState("");
   const [name, setName] = useState("");
-  const [player, setPlayer] = useState(1);
+  const [player, setPlayer] = useState(null);
   const [secret, setSecret] = useState("");
   const [guess, setGuess] = useState("");
+  const [error, setError] = useState("");
   const [gameData, setGameData] = useState(null);
 
   const generateRoom = () =>
     Math.floor(1000 + Math.random() * 9000).toString();
 
-  const hasUnique = (n) =>
-    n.length === 4 && new Set(n.split("")).size === 4;
+  const hasDuplicate = (n) =>
+    new Set(n.split("")).size !== n.length;
+
+  const isValidNumber = (n) =>
+    /^\d{4}$/.test(n);
 
   const createRoom = () => {
+    if (!name) return;
+
     const newRoom = generateRoom();
     setRoom(newRoom);
     setPlayer(1);
@@ -68,12 +74,23 @@ function App() {
   };
 
   const joinRoom = () => {
+    if (!name || room.length !== 4) return;
+
     const ref = db.ref("rooms/" + room);
+
     ref.once("value", snap => {
       if (!snap.exists()) {
         alert("Room not found");
         return;
       }
+
+      const data = snap.val();
+
+      if (data.player2) {
+        alert("Room already full");
+        return;
+      }
+
       ref.update({ player2: name });
       setPlayer(2);
       setScreen("setup");
@@ -88,7 +105,17 @@ function App() {
   }, [room]);
 
   const submitSecret = () => {
-    if (!hasUnique(secret)) return;
+    setError("");
+
+    if (!isValidNumber(secret)) {
+      setError("Enter 4 digit number");
+      return;
+    }
+
+    if (hasDuplicate(secret)) {
+      setError("Duplicate number not allowed");
+      return;
+    }
 
     db.ref("rooms/" + room).update({
       ["secret" + player]: secret
@@ -116,9 +143,19 @@ function App() {
   };
 
   const makeGuess = () => {
-    if (!gameData) return;
-    if (gameData.turn !== player) return;
-    if (!hasUnique(guess)) return;
+    setError("");
+
+    if (!gameData || gameData.turn !== player) return;
+
+    if (!isValidNumber(guess)) {
+      setError("Enter 4 digit number");
+      return;
+    }
+
+    if (hasDuplicate(guess)) {
+      setError("Duplicate number not allowed");
+      return;
+    }
 
     const opponentSecret =
       player === 1 ? gameData.secret2 : gameData.secret1;
@@ -143,6 +180,8 @@ function App() {
     setGuess("");
   };
 
+  /* ------------------ SCREENS ------------------ */
+
   if (screen === "menu")
     return (
       <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
@@ -152,9 +191,9 @@ function App() {
           value={name}
           onChange={e => setName(e.target.value)}
         />
+
         <button
           onClick={createRoom}
-          disabled={!name}
           className="bg-purple-600 text-white w-full p-2 mb-3 rounded"
         >
           Create Room
@@ -170,7 +209,6 @@ function App() {
 
         <button
           onClick={joinRoom}
-          disabled={!name || room.length !== 4}
           className="bg-pink-600 text-white w-full p-2 rounded"
         >
           Join Room
@@ -182,15 +220,18 @@ function App() {
     return (
       <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
         <h2 className="text-xl font-bold mb-3">Room {room}</h2>
+        <p className="mb-2">Hi, {name}</p>
         <p>You are Player {player}</p>
 
         <input
-          className="border p-2 w-full mb-3 text-center text-xl"
+          className="border p-2 w-full mb-2 text-center text-xl"
           maxLength="4"
           value={secret}
           onChange={e => setSecret(e.target.value)}
           placeholder="Secret Number"
         />
+
+        {error && <p className="text-red-500 mb-2">{error}</p>}
 
         <button
           onClick={submitSecret}
@@ -210,36 +251,47 @@ function App() {
 
   if (screen === "play")
     return (
-      <div className="max-w-4xl mx-auto mt-10 bg-white p-6 rounded-xl">
+      <div className="max-w-5xl mx-auto mt-10 bg-white p-6 rounded-xl relative">
 
-        <h2 className="text-xl font-bold mb-4">Room {room}</h2>
-
-        <div className="mb-4 p-3 bg-gray-100 rounded">
-          <p className="font-bold">Your Secret:</p>
-          <p className="text-xl">
-            {player === 1 ? gameData.secret1 : gameData.secret2}
-          </p>
+        {/* Top Right Greeting */}
+        <div className="absolute top-4 right-6 text-lg font-semibold">
+          Hi, {name}
         </div>
 
-        <p className="text-center mb-3 font-semibold">
-          {gameData.turn === player ? "Your Turn" : "Opponent's Turn"}
+        <h2 className="text-xl font-bold mb-4">
+          Room: {room}
+        </h2>
+
+        {/* Turn Display */}
+        <p className="text-center text-lg font-semibold mb-4">
+          Turn: {gameData.turn === 1 ? gameData.player1 : gameData.player2}
+        </p>
+
+        {/* Show Own Secret */}
+        <p className="mb-6">
+          Your Secret: {player === 1 ? gameData.secret1 : gameData.secret2}
         </p>
 
         {!gameData.winner && (
           <>
             <input
-              disabled={gameData.turn !== player}
-              className="border p-2 w-full mb-3 text-center text-xl"
+              className="border p-2 w-full mb-2 text-center text-xl"
               maxLength="4"
               value={guess}
               onChange={e => setGuess(e.target.value)}
-              placeholder="Your Guess"
+              placeholder="Enter Guess"
             />
+
+            {error && <p className="text-red-500 mb-2">{error}</p>}
 
             <button
               disabled={gameData.turn !== player}
               onClick={makeGuess}
-              className="bg-purple-600 text-white w-full p-2 rounded mb-6 disabled:opacity-50"
+              className={`w-full p-2 rounded mb-6 text-white ${
+                gameData.turn === player
+                  ? "bg-purple-600"
+                  : "bg-gray-400 cursor-not-allowed"
+              }`}
             >
               Submit Guess
             </button>
@@ -247,9 +299,8 @@ function App() {
         )}
 
         <div className="grid grid-cols-2 gap-6">
-
           <div>
-            <h3 className="font-bold mb-2">Player 1 Guesses</h3>
+            <h3 className="font-bold mb-2">{gameData.player1} Guesses</h3>
             {(gameData?.guesses || [])
               .filter(g => g.player === 1)
               .map((g, i) => (
@@ -260,7 +311,7 @@ function App() {
           </div>
 
           <div>
-            <h3 className="font-bold mb-2">Player 2 Guesses</h3>
+            <h3 className="font-bold mb-2">{gameData.player2} Guesses</h3>
             {(gameData?.guesses || [])
               .filter(g => g.player === 2)
               .map((g, i) => (
@@ -269,17 +320,11 @@ function App() {
                 </div>
               ))}
           </div>
-
         </div>
 
         {gameData?.winner && (
           <div className="text-center text-2xl mt-6">
-            {gameData.winner === player ? "You Win!" : "You Lose!"}
-
-            <div className="mt-4 text-lg">
-              <p>Player 1 Secret: {gameData.secret1}</p>
-              <p>Player 2 Secret: {gameData.secret2}</p>
-            </div>
+            Winner: {gameData.winner === 1 ? gameData.player1 : gameData.player2}
           </div>
         )}
 
