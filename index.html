@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Number Guess Multiplayer</title>
 
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#9333ea">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -180,8 +184,6 @@ function App() {
     setGuess("");
   };
 
-  /* ------------------ SCREENS ------------------ */
-
   if (screen === "menu")
     return (
       <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
@@ -253,7 +255,6 @@ function App() {
     return (
       <div className="max-w-5xl mx-auto mt-10 bg-white p-6 rounded-xl relative">
 
-        {/* Top Right Greeting */}
         <div className="absolute top-4 right-6 text-lg font-semibold">
           Hi, {name}
         </div>
@@ -262,12 +263,10 @@ function App() {
           Room: {room}
         </h2>
 
-        {/* Turn Display */}
         <p className="text-center text-lg font-semibold mb-4">
           Turn: {gameData.turn === 1 ? gameData.player1 : gameData.player2}
         </p>
 
-        {/* Show Own Secret */}
         <p className="mb-6">
           Your Secret: {player === 1 ? gameData.secret1 : gameData.secret2}
         </p>
@@ -305,7 +304,7 @@ function App() {
               .filter(g => g.player === 1)
               .map((g, i) => (
                 <div key={i} className="border p-2 mb-2">
-                  {g.guess} → {g.correctNum} numbers, {g.correctPos} positions
+                  {g.guess} → {g.correctNum} numbers, {g.correctPos} places
                 </div>
               ))}
           </div>
@@ -316,7 +315,7 @@ function App() {
               .filter(g => g.player === 2)
               .map((g, i) => (
                 <div key={i} className="border p-2 mb-2">
-                  {g.guess} → {g.correctNum} numbers, {g.correctPos} positions
+                  {g.guess} → {g.correctNum} numbers, {g.correctPos} places
                 </div>
               ))}
           </div>
@@ -338,5 +337,21 @@ ReactDOM.createRoot(document.getElementById("root"))
   .render(<App />);
 
 </script>
+
+<!-- Service Worker Registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js')
+      .then(function () {
+        console.log("Service Worker Registered");
+      })
+      .catch(function (err) {
+        console.log("Service Worker Failed: ", err);
+      });
+  });
+}
+</script>
+
 </body>
 </html>
