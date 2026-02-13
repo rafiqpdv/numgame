@@ -40,6 +40,14 @@ const { useState, useEffect, useRef } = React;
 
 function App() {
 
+  const Header = () => (
+    <div className="text-center text-4xl font-extrabold 
+      bg-gradient-to-r from-yellow-300 via-pink-300 to-cyan-300 
+      text-transparent bg-clip-text mb-6">
+      AH Wonders Game
+    </div>
+  );
+
   const [screen, setScreen] = useState("menu");
   const [room, setRoom] = useState("");
   const [name, setName] = useState("");
@@ -66,6 +74,7 @@ function App() {
     const newRoom = generateRoom();
     setRoom(newRoom);
     setPlayer(1);
+    setScreen("game");
 
     db.ref("rooms/" + newRoom).set({
       player1: name,
@@ -77,8 +86,6 @@ function App() {
       turn: 1,
       status: "waiting"
     });
-
-    setScreen("game");
   };
 
   const joinRoom = () => {
@@ -131,7 +138,6 @@ function App() {
 
   const submitSecret = () => {
     setError("");
-
     if (!isValidNumber(secret)) return setError("Enter 4 digits");
     if (hasDuplicate(secret)) return setError("No duplicates allowed");
 
@@ -155,7 +161,6 @@ function App() {
 
   const makeGuess = () => {
     setError("");
-
     if (gameData.turn !== player) return;
     if (!isValidNumber(guess)) return setError("Enter 4 digits");
     if (hasDuplicate(guess)) return setError("No duplicates allowed");
@@ -184,37 +189,25 @@ function App() {
     setGuess("");
   };
 
-  const Header = () => (
-    <div className="text-center text-4xl font-extrabold 
-    bg-gradient-to-r from-yellow-300 via-pink-300 to-cyan-300 
-    text-transparent bg-clip-text mb-6">
-      AH Wonders Game
-    </div>
-  );
-
   if (screen === "menu")
     return (
       <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl">
         <Header />
-
         <input className="border p-2 w-full mb-3"
           placeholder="Your name"
           value={name}
           onChange={e => setName(e.target.value)}
         />
-
         <button onClick={createRoom}
           className="bg-purple-600 text-white w-full p-2 mb-3 rounded">
           Create Room
         </button>
-
         <input className="border p-2 w-full mb-3 text-center"
           placeholder="Room Code"
           maxLength="4"
           value={room}
           onChange={e => setRoom(e.target.value)}
         />
-
         <button onClick={joinRoom}
           className="bg-pink-600 text-white w-full p-2 rounded">
           Join Room
@@ -222,7 +215,13 @@ function App() {
       </div>
     );
 
-  if (!gameData) return null;
+  if (!gameData)
+    return (
+      <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded-xl text-center">
+        <Header />
+        <div className="text-lg font-semibold">Loading Room...</div>
+      </div>
+    );
 
   return (
     <div className="max-w-5xl mx-auto mt-10 bg-white p-6 rounded-xl">
@@ -251,7 +250,7 @@ function App() {
         </>
       )}
 
-      {gameData.status === "playing" || gameData.status === "finished" ? (
+      {(gameData.status === "playing" || gameData.status === "finished") && (
         <>
           <p className="text-center font-semibold mb-4">
             Turn: {gameData.turn === 1 ? gameData.player1 : gameData.player2}
@@ -266,9 +265,7 @@ function App() {
                 onChange={e => setGuess(e.target.value.replace(/\D/g,''))}
                 placeholder="Enter Guess"
               />
-
               {error && <p className="text-red-500 mb-2">{error}</p>}
-
               <button disabled={gameData.turn !== player}
                 onClick={makeGuess}
                 className="w-full p-2 rounded mb-6 text-white bg-purple-600">
@@ -283,7 +280,6 @@ function App() {
                 <h3 className="font-bold mb-2">
                   {gameData["player"+p]} Guesses
                 </h3>
-
                 {(gameData.guesses || [])
                   .filter(g => g.player === p)
                   .map((g,i) => (
@@ -314,16 +310,12 @@ function App() {
               <div className="text-2xl font-bold mb-3">
                 Winner: {gameData.winner === 1 ? gameData.player1 : gameData.player2}
               </div>
-
               <div className="mb-4">
-                <div className="text-sm text-gray-600">
-                  Opponent Secret Number
-                </div>
+                <div className="text-sm text-gray-600">Opponent Secret Number</div>
                 <div className="text-3xl font-bold text-purple-700">
                   {gameData.winner === 1 ? gameData.secret2 : gameData.secret1}
                 </div>
               </div>
-
               <button
                 onClick={()=>{
                   setRoom("");
@@ -339,7 +331,7 @@ function App() {
             </div>
           )}
         </>
-      ) : null}
+      )}
     </div>
   );
 }
